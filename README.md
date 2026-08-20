@@ -4,7 +4,7 @@ A Python tool that polls well-known cybersecurity RSS feeds, deduplicates items 
 
 ## Features
 
-- Polls a curated list of major cybersecurity RSS feeds (Krebs on Security, BleepingComputer, The Hacker News, Dark Reading, and more)
+- Polls a curated list of major cybersecurity RSS feeds (Krebs on Security, BleepingComputer, The Hacker News, Dark Reading, and more), including healthcare-breach news (HIPAA Journal) and OT/ICS-focused sources (Industrial Cyber) for connected-device exposure
 - Tracks previously seen items in a local SQLite database so re-runs never repeat themselves
 - Categorizes headlines as CVE, Zero-Day/Actively Exploited, Ransomware, or Breach using keyword and CVE-ID matching
 - Maintains a running `.xlsx` log on your Desktop, with newest items always inserted at the top

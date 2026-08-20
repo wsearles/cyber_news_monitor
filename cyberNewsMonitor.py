@@ -86,6 +86,15 @@ DEFAULT_FEEDS = [
     # intel is most of what they publish here anyway.
     {"name": "Microsoft Security Blog", "url": "https://www.microsoft.com/en-us/security/blog/feed/"},
     {"name": "Securelist (Kaspersky)", "url": "https://securelist.com/feed/"},
+    {"name": "FortiGuard Labs Threat Research", "url": "https://feeds.fortinet.com/fortinet/blog/threat-research"},
+    # Healthcare breach/incident news -- directly relevant given our sector.
+    {"name": "HIPAA Journal", "url": "https://www.hipaajournal.com/feed/"},
+    {"name": "The Guardian Security", "url": "https://www.theguardian.com/technology/data-computer-security/rss"},
+    # OT/ICS-focused -- relevant given connected medical device exposure.
+    {"name": "Industrial Cyber", "url": "https://industrialcyber.co/feed"},
+    # Raw vulnerability-disclosure mailing list, not curated news -- expect
+    # more technical/PoC-heavy entries than the other feeds.
+    {"name": "Seclists Full Disclosure", "url": "https://seclists.org/rss/fulldisclosure.rss"},
 ]
 
 # --------------------------------------------------------------------------
