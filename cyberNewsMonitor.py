@@ -331,9 +331,9 @@ def get_desktop_path() -> Path:
     candidates = []
 
     if system == "Windows":
-        onedrive = os.environ.get("OneDrive") or os.environ.get("OneDriveConsumer")
-        if onedrive:
-            candidates.append(Path(onedrive) / "Desktop")  # OneDrive-redirected Desktop
+        # %USERPROFILE%\Desktop, even under OneDrive Known Folder Move, where
+        # it's a junction into the OneDrive-managed folder -- so this stays
+        # provider-agnostic rather than hardcoding a OneDrive-specific path.
         candidates.append(home / "Desktop")
     elif system == "Darwin":
         candidates.append(home / "Desktop")
