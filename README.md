@@ -1,6 +1,8 @@
 # cyber_news_monitor
 
-A Python tool that polls well-known cybersecurity RSS feeds, deduplicates items you've already seen in a local SQLite database, and flags headlines that look like new CVEs, data breaches, ransomware attacks, or actively-exploited zero-days. Matches are printed to the console, logged to a local `.xlsx` spreadsheet and/or a standalone HTML report, and optionally written as a Markdown digest or posted to Slack.
+A tool that polls well-known cybersecurity RSS feeds, deduplicates items you've already seen in a local SQLite database, and flags headlines that look like new CVEs, data breaches, ransomware attacks, or actively-exploited zero-days. Matches are printed to the console, logged to a local `.xlsx` spreadsheet and/or a standalone HTML report, and optionally written as a Markdown digest or posted to Slack.
+
+The primary implementation is a Python script (below); a Go port that builds to a single-binary `.exe` for distributing to Windows users without Python is also available -- see [Go port (single-binary distribution)](#go-port-single-binary-distribution).
 
 ## Getting started (Azure DevOps clone)
 
@@ -135,6 +137,28 @@ python resetSeenDb.py --yes      # skip the confirmation prompt
 ```
 
 This only clears dedup history -- it does not touch the `.xlsx` log, HTML report, or Markdown digests already saved.
+
+## Go port (single-binary distribution)
+
+`go/` contains a Go port of this tool, built for handing a single `.exe` to Windows users who don't have Python or want to run anything from a terminal. It's not a wrapper around the Python script -- it's a from-scratch reimplementation of the same feed-fetch/dedup/categorize/report logic, kept in sync by hand.
+
+Where the Go version differs from the Python one described above:
+
+- **HTML report is the default output**, not opt-in -- running the `.exe` with zero flags writes/updates both the `.xlsx` log and the HTML report on the Desktop and opens the report in your browser, since a double-clicked binary has no `--html-path` to pass. Use `--no-html` or `--no-xlsx` to disable either, and `--no-open` to skip the browser launch.
+- No `--feeds-file`-less customization beyond that JSON file -- there's no separate "edit the script" path for keyword lists like `RANSOMWARE_TERMS`; those are compiled into the binary (`go/internal/feeds/feeds.go`) and require a rebuild to change.
+- No `resetSeenDb.py` equivalent yet -- delete the sqlite file at `--db`'s path (default `~/.cyber_monitor/seen.sqlite3`, same default as the Python version) to reset dedup history.
+
+All other flags (`--all`, `--lookback-hours`, `--digest-dir`, `--slack-webhook`, `--watch`, `--interval`, `--db`) work the same as the table above.
+
+### Building
+
+Requires the [Go toolchain](https://go.dev/dl/) (1.21+). From the `go/` directory:
+
+```powershell
+.\build.ps1
+```
+
+This produces `go\dist\cybernewsmonitor.exe` -- a stripped, CGO-free, single-file binary (no Python, no DLLs, no installer needed on the machine that runs it). See `go/build.ps1` for the underlying `go build` flags if you want to build for a different target.
 
 ## License
 
