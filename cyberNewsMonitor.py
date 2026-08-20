@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-cyber_news_monitor.py
+cyberNewsMonitor.py
 
 Pulls headlines from well-known cybersecurity RSS feeds, skips anything
 you've already seen (tracked in a small local SQLite database), and
@@ -8,10 +8,12 @@ highlights items that look like new CVEs, data breaches, ransomware
 attacks, or actively-exploited zero-days.
 
 Usage:
-    python3 cyber_news_monitor.py                  # run once, print results
-    python3 cyber_news_monitor.py --all             # show everything, not just matches
-    python3 cyber_news_monitor.py --watch --interval 30   # poll every 30 min, forever
-    python3 cyber_news_monitor.py --digest-dir ~/cyber-digests   # also save a Markdown file
+    python3 cyberNewsMonitor.py                  # run once, print results
+    python3 cyberNewsMonitor.py --all             # show everything, not just matches
+    python3 cyberNewsMonitor.py --watch --interval 30   # poll every 30 min, forever
+    python3 cyberNewsMonitor.py --digest-dir ~/cyber-digests   # also save a Markdown file
+    python3 cyberNewsMonitor.py --html-path            # save an HTML report to the Desktop & open it
+    python3 cyberNewsMonitor.py --html-path ~/cyber-news.html   # ...or save it to a custom path
 
 First run note: each feed only ever returns its most recent ~20-50 items,
 so you won't get flooded with years of history. The --lookback-hours flag
@@ -21,6 +23,7 @@ so you won't get flooded with years of history. The --lookback-hours flag
 import argparse
 import calendar
 import hashlib
+import html
 import json
 import os
 import platform
@@ -30,6 +33,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+import webbrowser
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -50,6 +54,10 @@ except ImportError:
 XLSX_HEADERS = ["Title", "Categories", "CVEs", "Source Feed", "Published (UTC)", "Link", "First Seen (UTC)"]
 XLSX_COLUMN_WIDTHS = [70, 30, 22, 24, 18, 70, 18]
 XLSX_DEFAULT_FILENAME = "cyber_security_news.xlsx"
+
+HTML_HEADERS = ["Title", "Categories", "CVEs", "Source Feed", "Published (UTC)", "Link", "First Seen (UTC)"]
+HTML_DEFAULT_FILENAME = "cyber_security_news.html"
+HTML_DESKTOP_DEFAULT = "__desktop__"  # sentinel: --html-path passed with no value
 
 
 # --------------------------------------------------------------------------
@@ -407,6 +415,173 @@ def prepend_to_xlsx(items: list, xlsx_path: Path) -> None:
     wb.save(xlsx_path)
 
 
+# --------------------------------------------------------------------------
+# HTML report -- contains the same rows as the .xlsx log, rendered as a
+# standalone webpage with clickable links. The current row set is embedded
+# in the page itself as a JSON blob, so re-runs can load it back, prepend
+# the new items, and rewrite the page -- no separate data file needed.
+# --------------------------------------------------------------------------
+HTML_DATA_RE = re.compile(
+    r'<script type="application/json" id="row-data">(.*?)</script>', re.DOTALL
+)
+
+CATEGORY_BADGE_CLASSES = {
+    "CVE": "badge-cve",
+    "Zero-Day/Actively Exploited": "badge-zeroday",
+    "Ransomware": "badge-ransomware",
+    "Breach": "badge-breach",
+}
+
+
+def load_html_rows(html_path: Path) -> list:
+    if not html_path.exists():
+        return []
+    match = HTML_DATA_RE.search(html_path.read_text(encoding="utf-8"))
+    if not match:
+        return []
+    try:
+        return json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return []
+
+
+def item_to_row(it: Item, now_str: str) -> dict:
+    return {
+        "title": it.title,
+        "categories": ", ".join(it.categories) if it.categories else "Uncategorized",
+        "cves": ", ".join(it.cves),
+        "feed": it.feed,
+        "published": it.published.strftime("%Y-%m-%d %H:%M") if it.published else "",
+        "link": it.link,
+        "first_seen": now_str,
+    }
+
+
+def render_category_badges(categories: str) -> str:
+    if not categories:
+        return ""
+    spans = []
+    for cat in categories.split(", "):
+        css_class = CATEGORY_BADGE_CLASSES.get(cat, "badge-other")
+        spans.append(f'<span class="badge {css_class}">{html.escape(cat)}</span>')
+    return "".join(spans)
+
+
+def render_html_report(rows: list) -> str:
+    generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    table_rows = []
+    for row in rows:
+        link = row.get("link", "")
+        link_cell = (
+            f'<a href="{html.escape(link, quote=True)}" target="_blank" rel="noopener noreferrer">'
+            f'{html.escape(link)}</a>' if link else ""
+        )
+        table_rows.append(
+            "<tr>"
+            f'<td>{html.escape(row.get("title", ""))}</td>'
+            f'<td>{render_category_badges(row.get("categories", ""))}</td>'
+            f'<td>{html.escape(row.get("cves", ""))}</td>'
+            f'<td>{html.escape(row.get("feed", ""))}</td>'
+            f'<td>{html.escape(row.get("published", ""))}</td>'
+            f'<td>{link_cell}</td>'
+            f'<td>{html.escape(row.get("first_seen", ""))}</td>'
+            "</tr>"
+        )
+
+    header_cells = "".join(f"<th>{html.escape(h)}</th>" for h in HTML_HEADERS)
+    # Escape "</" so a title/summary containing "</script>" can't break out of
+    # the data blob early -- "\/" is a valid JSON escape for "/", so this is
+    # transparent to json.loads() on the next run.
+    data_blob = json.dumps(rows).replace("</", "<\\/")
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cyber Security News</title>
+<style>
+  :root {{
+    --bg: #f7f8fa; --surface: #ffffff; --text: #1a1d21; --muted: #5b6270;
+    --border: #e2e5ea; --link: #0b57d0; --header-bg: #14161a; --header-text: #ffffff;
+  }}
+  @media (prefers-color-scheme: dark) {{
+    :root {{
+      --bg: #14161a; --surface: #1c1f24; --text: #e8eaed; --muted: #9aa1ac;
+      --border: #2b2f36; --link: #8ab4f8; --header-bg: #0e0f12; --header-text: #e8eaed;
+    }}
+  }}
+  * {{ box-sizing: border-box; }}
+  body {{
+    margin: 0; padding: 2rem; background: var(--bg); color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  }}
+  h1 {{ margin: 0 0 0.25rem; font-size: 1.4rem; }}
+  .meta {{ color: var(--muted); margin: 0 0 1.25rem; font-size: 0.9rem; }}
+  .table-wrap {{
+    overflow-x: auto; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface);
+  }}
+  table {{ border-collapse: collapse; width: 100%; min-width: 900px; }}
+  th, td {{
+    text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);
+    vertical-align: top; font-size: 0.9rem;
+  }}
+  thead th {{
+    background: var(--header-bg); color: var(--header-text); position: sticky; top: 0;
+  }}
+  tbody tr:hover {{ background: color-mix(in srgb, var(--text) 4%, transparent); }}
+  a {{ color: var(--link); text-decoration: none; word-break: break-all; }}
+  a:hover {{ text-decoration: underline; }}
+  .badge {{
+    display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px;
+    font-size: 0.75rem; font-weight: 600; margin: 0 0.25rem 0.25rem 0; white-space: nowrap;
+  }}
+  .badge-cve {{ background: #e3edff; color: #0b3d91; }}
+  .badge-zeroday {{ background: #fde3e3; color: #8a1c1c; }}
+  .badge-ransomware {{ background: #f1e3ff; color: #5a1c8a; }}
+  .badge-breach {{ background: #ffe9d1; color: #8a4a0a; }}
+  .badge-other {{ background: var(--border); color: var(--muted); }}
+  @media (prefers-color-scheme: dark) {{
+    .badge-cve {{ background: #1c2b4a; color: #a9c3ff; }}
+    .badge-zeroday {{ background: #3a1c1c; color: #ffb3b3; }}
+    .badge-ransomware {{ background: #2f1c3a; color: #dcb3ff; }}
+    .badge-breach {{ background: #3a2a10; color: #ffcf94; }}
+  }}
+</style>
+</head>
+<body>
+  <h1>Cyber Security News</h1>
+  <p class="meta">{len(rows)} item(s) &middot; last updated {generated}</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>{header_cells}</tr></thead>
+      <tbody>
+        {"".join(table_rows)}
+      </tbody>
+    </table>
+  </div>
+  <script type="application/json" id="row-data">{data_blob}</script>
+</body>
+</html>
+"""
+
+
+def prepend_to_html(items: list, html_path: Path) -> None:
+    """Adds new items as rows at the top of the page, ahead of previously
+    saved rows -- so the file always reads newest-first, mirroring the
+    .xlsx log."""
+    if not items:
+        return
+
+    existing_rows = load_html_rows(html_path)
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+    new_rows = [item_to_row(it, now_str) for it in items]
+    combined_rows = new_rows + existing_rows
+
+    html_path.parent.mkdir(parents=True, exist_ok=True)
+    html_path.write_text(render_html_report(combined_rows), encoding="utf-8")
+
+
 def maybe_notify_slack(items: list, webhook_url: Optional[str]) -> None:
     if not webhook_url or not items:
         return
@@ -439,6 +614,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--digest-dir", help="If set, also write a Markdown digest file into this directory")
     p.add_argument("--xlsx-path", help="Override the .xlsx output location (default: cyber_security_news.xlsx on the Desktop)")
     p.add_argument("--no-xlsx", action="store_true", help="Disable writing/updating the .xlsx log on the Desktop")
+    p.add_argument(
+        "--html-path", nargs="?", const=HTML_DESKTOP_DEFAULT, default=None,
+        help="Also write/update an HTML report with clickable links and open it in your "
+             "default browser after saving. Optionally pass a path to override the default "
+             f"location ({HTML_DEFAULT_FILENAME} on the Desktop)."
+    )
     p.add_argument("--slack-webhook", default=os.environ.get("CYBER_MONITOR_SLACK_WEBHOOK"),
                     help="Slack incoming-webhook URL to post new items to "
                          "(or set CYBER_MONITOR_SLACK_WEBHOOK env var)")
@@ -472,6 +653,19 @@ def main() -> None:
                 print(f"  [warn] Could not write {xlsx_path} -- is it open in Excel? Close it and rerun.", file=sys.stderr)
             except Exception as exc:
                 print(f"  [warn] Failed to update {xlsx_path}: {exc}", file=sys.stderr)
+        if args.html_path:
+            if args.html_path == HTML_DESKTOP_DEFAULT:
+                html_path = get_desktop_path() / HTML_DEFAULT_FILENAME
+            else:
+                html_path = Path(args.html_path).expanduser()
+            try:
+                prepend_to_html(items, html_path)
+                if items:
+                    print(f"Added {len(items)} row(s) to the top of {html_path}")
+                    if not webbrowser.open(html_path.resolve().as_uri()):
+                        print(f"  [warn] Could not open a browser automatically -- open {html_path} manually.", file=sys.stderr)
+            except OSError as exc:
+                print(f"  [warn] Failed to update {html_path}: {exc}", file=sys.stderr)
         maybe_notify_slack(items, args.slack_webhook)
 
     if not args.watch:

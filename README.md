@@ -1,6 +1,6 @@
 # cyber_news_monitor
 
-A Python tool that polls well-known cybersecurity RSS feeds, deduplicates items you've already seen in a local SQLite database, and flags headlines that look like new CVEs, data breaches, ransomware attacks, or actively-exploited zero-days. Matches are printed to the console, logged to a local `.xlsx` spreadsheet, and optionally written as a Markdown digest or posted to Slack.
+A Python tool that polls well-known cybersecurity RSS feeds, deduplicates items you've already seen in a local SQLite database, and flags headlines that look like new CVEs, data breaches, ransomware attacks, or actively-exploited zero-days. Matches are printed to the console, logged to a local `.xlsx` spreadsheet and/or a standalone HTML report, and optionally written as a Markdown digest or posted to Slack.
 
 ## Features
 
@@ -8,6 +8,7 @@ A Python tool that polls well-known cybersecurity RSS feeds, deduplicates items 
 - Tracks previously seen items in a local SQLite database so re-runs never repeat themselves
 - Categorizes headlines as CVE, Zero-Day/Actively Exploited, Ransomware, or Breach using keyword and CVE-ID matching
 - Maintains a running `.xlsx` log on your Desktop, with newest items always inserted at the top
+- Optionally maintains the same data as a self-contained HTML report with clickable links, viewable in any browser
 - Optionally writes a Markdown digest per run and/or posts new items to a Slack channel via webhook
 - Can run once or continuously in `--watch` mode on a configurable polling interval
 
@@ -30,6 +31,8 @@ python cyberNewsMonitor.py                              # run once, print matche
 python cyberNewsMonitor.py --all                         # show everything, not just matches
 python cyberNewsMonitor.py --watch --interval 30          # poll every 30 minutes, forever
 python cyberNewsMonitor.py --digest-dir ~/cyber-digests   # also save a Markdown digest per run
+python cyberNewsMonitor.py --html-path              # save an HTML report to the Desktop & open it
+python cyberNewsMonitor.py --html-path ~/cyber-news.html   # ...or save it to a custom path
 ```
 
 On first run, each feed only returns its most recent ~20-50 items, so you won't be flooded with years of history. The `--lookback-hours` flag (default 48) additionally hides anything older than that on top of deduplication.
@@ -45,6 +48,7 @@ On first run, each feed only returns its most recent ~20-50 items, so you won't 
 | `--digest-dir PATH` | Also write a Markdown digest file into this directory |
 | `--xlsx-path PATH` | Override the `.xlsx` output location (default: `cyber_security_news.xlsx` on the Desktop) |
 | `--no-xlsx` | Disable writing/updating the `.xlsx` log |
+| `--html-path [PATH]` | Also write/update an HTML report with clickable links, then open it in your default browser. Defaults to `cyber_security_news.html` on the Desktop; pass a path to override |
 | `--slack-webhook URL` | Post new items to a Slack incoming webhook (or set `CYBER_MONITOR_SLACK_WEBHOOK`) |
 | `--no-color` | Disable ANSI color in console output |
 | `--watch` | Keep running, polling on a fixed interval |
@@ -82,6 +86,7 @@ Add, remove, or edit entries in these lists to broaden or narrow what counts as 
 
 - **Console** — a formatted report of new matching items, grouped and color-highlighted when run in a terminal
 - **`.xlsx` log** — new rows are inserted at the top of `cyber_security_news.xlsx` (Desktop by default), so the file always reads newest-first
+- **HTML report** (optional) — a standalone webpage (Desktop by default, or a custom path via `--html-path`), containing the same columns as the `.xlsx` log with clickable links, category badges, and light/dark theming. New items are prepended on each run, same as the spreadsheet; the underlying row data is embedded in the page itself, so no separate data file is needed. Opens automatically in your default browser after each save
 - **Markdown digest** (optional) — a timestamped `cyber-digest-*.md` file per run when `--digest-dir` is set
 - **Slack** (optional) — a summary message posted to a Slack incoming webhook when `--slack-webhook` (or `CYBER_MONITOR_SLACK_WEBHOOK`) is set
 

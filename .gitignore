@@ -31,4 +31,5 @@ Thumbs.db
 # Script-specific local outputs
 *.sqlite3
 *.xlsx
+*.html
 cyber-digest-*.md
