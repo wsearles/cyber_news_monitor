@@ -2,6 +2,31 @@
 
 A Python tool that polls well-known cybersecurity RSS feeds, deduplicates items you've already seen in a local SQLite database, and flags headlines that look like new CVEs, data breaches, ransomware attacks, or actively-exploited zero-days. Matches are printed to the console, logged to a local `.xlsx` spreadsheet and/or a standalone HTML report, and optionally written as a Markdown digest or posted to Slack.
 
+## Getting started (Azure DevOps clone)
+
+This project is also mirrored to Azure DevOps. If you have the Azure CLI installed, this is the quickest way to get a local copy open in VS Code:
+
+1. **Sign in to Azure**, if you haven't already:
+   ```bash
+   az login
+   ```
+2. **Confirm the repo URL** (optional -- the project name has a space in it, so it's easy to get the URL-encoding wrong by hand):
+   ```bash
+   az repos list --organization https://dev.azure.com/GHS-ITDS --project "Information Security Operations" -o table
+   ```
+   The clone URL for this repo is:
+   ```
+   https://dev.azure.com/GHS-ITDS/Information%20Security%20Operations/_git/Cyber_News_Monitor
+   ```
+3. **Clone from VS Code** -- press `Ctrl+Shift+P`, run **"Git: Clone"**, paste the URL above, pick a local folder, then click **"Open"** when prompted.
+4. **First-time sign-in** -- a browser window will pop up asking you to sign in with your Gundersen Microsoft account. This is Git Credential Manager doing an Azure AD login (separate from `az login`, but the same account); it only asks once and caches the credential afterward. If it asks for a username/password instead of opening a browser, reinstalling [Git for Windows](https://git-scm.com/download/win) will bring in a current Credential Manager.
+5. **Install dependencies** in the VS Code terminal (opens already in the cloned folder):
+   ```bash
+   pip install -r cyberNewsRequirements.txt
+   ```
+
+From there, see [Usage](#usage) below -- in particular, [Running via VS Code's "Run" button](#running-via-vs-codes-run-button-no-terminal-no-flags) if you'd rather not touch the terminal at all.
+
 ## Features
 
 - Polls a curated list of major cybersecurity RSS feeds (Krebs on Security, BleepingComputer, The Hacker News, Dark Reading, and more), including healthcare-breach news (HIPAA Journal) and OT/ICS-focused sources (Industrial Cyber) for connected-device exposure
