@@ -33,3 +33,8 @@ Thumbs.db
 *.xlsx
 *.html
 cyber-digest-*.md
+
+# Go build artifacts
+go/cybernewsmonitor
+go/cybernewsmonitor.exe
+go/bin/
