@@ -15,6 +15,10 @@ Usage:
     python3 cyberNewsMonitor.py --html-path            # save an HTML report to the Desktop & open it
     python3 cyberNewsMonitor.py --html-path ~/cyber-news.html   # ...or save it to a custom path
 
+Running via VS Code's "Run" button (no terminal, no flags)? Use
+cyberNewsMonitorHTML.py instead -- same tool, but it defaults to saving
+and opening the HTML report even with zero arguments.
+
 First run note: each feed only ever returns its most recent ~20-50 items,
 so you won't get flooded with years of history. The --lookback-hours flag
 (default 48) additionally hides anything older than that on top of dedup.
@@ -638,8 +642,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return p
 
 
-def main() -> None:
+def main(default_html: bool = False) -> None:
     args = build_arg_parser().parse_args()
+    if default_html and args.html_path is None:
+        args.html_path = HTML_DESKTOP_DEFAULT
     feeds = load_feeds(args.feeds_file)
     conn = open_db(Path(args.db))
     color = sys.stdout.isatty() and not args.no_color

@@ -35,6 +35,14 @@ python cyberNewsMonitor.py --html-path              # save an HTML report to the
 python cyberNewsMonitor.py --html-path ~/cyber-news.html   # ...or save it to a custom path
 ```
 
+### Running via VS Code's "Run" button (no terminal, no flags)
+
+`cyberNewsMonitorHTML.py` is a thin wrapper around `cyberNewsMonitor.py` that defaults to the HTML report even with zero arguments -- useful for opening the script in VS Code and just hitting the play button, where there's no chance to type `--html-path`. It accepts every other flag `cyberNewsMonitor.py` does (`--watch`, `--all`, `--digest-dir`, etc.); it only changes what happens when `--html-path` is omitted.
+
+```bash
+python cyberNewsMonitorHTML.py   # run once, save the HTML report to the Desktop, and open it
+```
+
 On first run, each feed only returns its most recent ~20-50 items, so you won't be flooded with years of history. The `--lookback-hours` flag (default 48) additionally hides anything older than that on top of deduplication.
 
 ### CLI options
@@ -89,6 +97,19 @@ Add, remove, or edit entries in these lists to broaden or narrow what counts as 
 - **HTML report** (optional) — a standalone webpage (Desktop by default, or a custom path via `--html-path`), containing the same columns as the `.xlsx` log with clickable links, category badges, and light/dark theming. New items are prepended on each run, same as the spreadsheet; the underlying row data is embedded in the page itself, so no separate data file is needed. Opens automatically in your default browser after each save
 - **Markdown digest** (optional) — a timestamped `cyber-digest-*.md` file per run when `--digest-dir` is set
 - **Slack** (optional) — a summary message posted to a Slack incoming webhook when `--slack-webhook` (or `CYBER_MONITOR_SLACK_WEBHOOK`) is set
+- **SQLite dedup database** — every item ever seen is recorded at `~/.cyber_monitor/seen.sqlite3` by default (override with `--db PATH`), so re-runs and `--watch` polls never repeat an item. This file isn't a "report" like the others above -- see [Resetting the dedup database](#resetting-the-dedup-database) if you want to clear it
+
+## Resetting the dedup database
+
+Because every seen item is remembered forever in the SQLite database above, testing the script repeatedly (new feeds, new keyword lists, a lower `--lookback-hours`) can look like "nothing new" even when it isn't -- everything's already marked seen. `resetSeenDb.py` deletes that database so the next run starts fresh, as if the monitor had never been run:
+
+```bash
+python resetSeenDb.py            # prompts for confirmation, deletes the default db
+python resetSeenDb.py --db PATH  # delete a custom db path instead (matches --db on the monitor)
+python resetSeenDb.py --yes      # skip the confirmation prompt
+```
+
+This only clears dedup history -- it does not touch the `.xlsx` log, HTML report, or Markdown digests already saved.
 
 ## License
 
